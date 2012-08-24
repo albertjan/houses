@@ -29,6 +29,7 @@ namespace AlbertJan.Funda
         public Guid Id { get; set; }
         public string AangebodenSindsTekst { get; set; }
         //should be datetime
+        //bugje gevonden in SimpleJson daarom wil deze niet direct vertaald worden naar een datetime.
         public string AanmeldDatum { get; set; }
         public int AantalKamers { get; set; }
         public string Adres { get; set; }
@@ -89,6 +90,7 @@ namespace AlbertJan.Funda
         public Realtor (int makelaarId, string makelaarNaam)
         {
             RealEstateObjects = new List<RealEstateObject> ();
+            //somige makelaars hebben geen Naam vandaar de MZN's
             Name = makelaarNaam ?? "Makelaar zonder naam (" + makelaarId + ")";
             RealtorID = makelaarId;
         }
@@ -102,6 +104,7 @@ namespace AlbertJan.Funda
             {
                 if (value != _numberOfObjects)
                 {
+                    //eventje af laten gaan als get aantal objecten veranderd is.
                     OnObjectCounted (new ObjectCountedEventArgs { Realtor = this });
                 }
                 _numberOfObjects = value;

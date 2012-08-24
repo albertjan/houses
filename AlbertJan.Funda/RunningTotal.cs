@@ -116,30 +116,40 @@ namespace AlbertJan.Funda
             OnNumberOfObjects (new NumberOfObjectsEventArgs { NumberOfObjects = restults.TotaalAantalObjecten });
 
             //LINQ voodoo-magic :)
-            //Maak een Enumerable met alle pagina nummers.
+            //Maak een Enumerable met alle pagina nummers. Begin met 1 en daarom dus ook 1 langer.
+            //Start een nieuwe task voor elke pagina. En wacht tot ze allemaal klaar zijn.
+            //je zou de afhandeling van de objecten ook nog in een continuation kunnen gooien maar aangezien dat bijna geen tijd kost..
             Task.WaitAll(Enumerable.Range(1, (restults.TotaalAantalObjecten/25) + 1).Select(page => Task.Factory.StartNew(() =>
             {
                 Console.WriteLine("Getting page: " + page);
                 var sw = new Stopwatch();
                 sw.Start();
+                //Doe de request voor de pagine
                 restults = FundaClient.GetJson(ApiKey, new
                 {
                     pagesize = 25, page, type = "koop", zo = _pattern
                 });
 
+                //loop door de resultaten heen.
                 foreach (var restult in restults.Objects)
                 {
+                    //als het een onbekende makelaar is voeg em toe en vuur een event af om de interface te updaten
                     if (!Realtors.ContainsKey(restult.Realtor.RealtorID))
                     {
                         Realtors.Add(restult.Realtor.RealtorID, restult.Realtor);
                         OnNewRealtor(new NewRealtorEventArgs { Realtor = restult.Realtor });
                     }
 
+                    //Verhoog het aantal getelde objecten voor de makelaar en voeg het object toe aan zijn lijst met objecten.
                     Realtors[restult.Realtor.RealtorID].NumberOfObjects++;
                     Realtors[restult.Realtor.RealtorID].RealEstateObjects.Add(restult);
                 }
                 sw.Stop();
-                var waitfor = (int) ((60000/110) - sw.ElapsedMilliseconds);
+                //60000 milliseconden per minuut / 100 requests per minuut maal het aantal paralelle taken - het aantal milisecinde dat deze operatie duurde. 
+                //om ervoor te zorgen dat er niet meer dan 100 requests per minuut zijn.
+                Console.WriteLine("took: " + sw.Elapsed);
+                var waitfor = (int) (((60000/100) * Environment.ProcessorCount) - sw.ElapsedMilliseconds);
+                //als rate limiting aanstaat ook echt wachten.
                 if (LimitRate) Thread.Sleep(waitfor < 0 ? 0 : waitfor);
             })).ToArray());
         }
