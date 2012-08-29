@@ -28,9 +28,7 @@ namespace AlbertJan.Funda
 
         public Guid Id { get; set; }
         public string AangebodenSindsTekst { get; set; }
-        //should be datetime
-        //bugje gevonden in SimpleJson daarom wil deze niet direct vertaald worden naar een datetime.
-        public string AanmeldDatum { get; set; }
+        public DateTime AanmeldDatum { get; set; }
         public int AantalKamers { get; set; }
         public string Adres { get; set; }
         public int Afstand { get; set; }

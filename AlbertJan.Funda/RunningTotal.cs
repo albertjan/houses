@@ -7,6 +7,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using DRC;
+using DRC.Interfaces;
 using ImpromptuInterface;
 
 namespace AlbertJan.Funda
@@ -16,7 +17,43 @@ namespace AlbertJan.Funda
     /// </summary>
     public interface IFundaClient
     {
-        FundaResult GetJson(string apiKey, object parameters);
+        FundaResult GetJson(Guid apiKey, object parameters);
+    }
+
+    /// <summary>
+    /// adds a slash after the functionparamters
+    /// client.GetNoun("test") will defaultly resolve to GET /noun/test
+    /// this composer will make 
+    /// GET /noun/test/
+    /// </summary>
+    public class AlternativeUriComposer : IUriComposer
+    {
+        public string ComposeUri (string baseUri, string location, object[] functionParameters, IEnumerable<KeyValuePair<string, string>> queryDictionary)
+        {
+            //Part 1 the basics http://thing.com/base/ + the nouns "/test"
+            var part1 = (baseUri != null ? baseUri + "/" : "") + location;
+            //Part 2 the parameters passed to the function call that aren't needed for the
+            //output editor.
+            var part2 = functionParameters == null || !functionParameters.Any()
+                            ? ""
+                            : "/" + functionParameters.Aggregate ((l, r) => l + "/" + r) + "/";
+            //Part 3 the querystring
+            var part3 = "";
+
+            if (queryDictionary != null && queryDictionary.Any())
+            {
+                part3 += "?";
+                foreach (var element in queryDictionary)
+                {
+                    if (element.Equals (queryDictionary.Last ()))
+                        part3 += element.Key + "=" + element.Value;
+                    else
+                        part3 += element.Key + "=" + element.Value + "&";
+                }
+            }
+
+            return part1 + part2 + part3;
+        }
     }
 
     /// <summary>
@@ -28,7 +65,7 @@ namespace AlbertJan.Funda
         /// Apikey (is een guid) maar opgelsagen als string met een trailing slash. Om te voorkomen dat de webservice een 307 stuurt. 
         /// De DRC plakt geen extra slash aan het eind van de url.
         /// </summary>
-        private const string ApiKey = "a001e6c3ee6e4853ab18fe44cc1494de/";
+        private static readonly Guid ApiKey = new Guid("a001e6c3ee6e4853ab18fe44cc1494de");
 
 
         /// <summary>
@@ -68,7 +105,7 @@ namespace AlbertJan.Funda
             _pattern = pattern;
 
             //de rest client http://nuget.org/packages/DRC en https://github.com/albertjan/DynamicRestClient
-            dynamic client = new RESTClient();
+            dynamic client = new RESTClient(uriComposer: new AlternativeUriComposer());
 
             //geen basis url op.
             client.Url = "http://partnerapi.funda.nl/feeds/Aanbod.svc";
