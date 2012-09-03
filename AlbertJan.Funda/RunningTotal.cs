@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -81,7 +82,7 @@ namespace AlbertJan.Funda
         /// <summary>
         /// De lijst van Makelaars.
         /// </summary>
-        public Dictionary<int, Realtor> Realtors { get; private set; }
+        public ConcurrentDictionary<int, Realtor> Realtors { get; private set; }
 
         /// <summary>
         /// Event dat af gaat als er een nieuwe makelaar gesignaleerd wordt.
@@ -101,7 +102,7 @@ namespace AlbertJan.Funda
         public RunningTotal(string pattern, bool limitRate)
         {
             LimitRate = limitRate;
-            Realtors = new Dictionary<int, Realtor> ();
+            Realtors = new ConcurrentDictionary<int, Realtor> ();
             _pattern = pattern;
 
             //de rest client http://nuget.org/packages/DRC en https://github.com/albertjan/DynamicRestClient
@@ -170,16 +171,19 @@ namespace AlbertJan.Funda
                 //loop door de resultaten heen.
                 foreach (var restult in restults.Objects)
                 {
-                    //als het een onbekende makelaar is voeg em toe en vuur een event af om de interface te updaten
-                    if (!Realtors.ContainsKey(restult.Realtor.RealtorID))
-                    {
-                        Realtors.Add(restult.Realtor.RealtorID, restult.Realtor);
-                        OnNewRealtor(new NewRealtorEventArgs { Realtor = restult.Realtor });
-                    }
-
-                    //Verhoog het aantal getelde objecten voor de makelaar en voeg het object toe aan zijn lijst met objecten.
-                    Realtors[restult.Realtor.RealtorID].NumberOfObjects++;
-                    Realtors[restult.Realtor.RealtorID].RealEstateObjects.Add(restult);
+                    //access to modyfied closure copietje.
+                    var restult1 = restult;
+                    Realtors.AddOrUpdate(restult.Realtor.RealtorID, i =>
+                                        {
+                                            OnNewRealtor (new NewRealtorEventArgs { Realtor = restult1.Realtor });
+                                            return restult1.Realtor;
+                                        },
+                                        (i, realtor) =>
+                                        {
+                                            realtor.NumberOfObjects++;
+                                            return realtor;
+                                        });
+                   
                 }
                 sw.Stop();
                 //60000 milliseconden per minuut / 100 requests per minuut maal het aantal paralelle taken - het aantal milisecinde dat deze operatie duurde. 
